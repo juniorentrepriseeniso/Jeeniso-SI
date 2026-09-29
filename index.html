@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JEENISo | Séminaire d'intégration</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#3594d6;--gray:#615f5f;--navy:#1a4a6b;--lblue:#71b4e2;--dgray:#3a3939;--lgray:#908f8f;--bar:#a9a2a1}
+*{box-sizing:border-box}
+body{margin:0;font-family:Montserrat,Arial,sans-serif;color:var(--dgray);background:#fff;line-height:1.5}
+.bar{display:flex;gap:8px;height:34px;margin:16px 16px 0}
+.bar i{flex:1;background:var(--blue)}.bar b{flex:2.4;background:var(--bar)}
+main{max-width:560px;margin:0 auto;padding:24px 20px 40px}
+.logo{display:block;height:64px;margin:0 0 28px}
+h1{font-weight:800;font-size:1.6rem;line-height:1.2;margin:0 0 8px;color:#000}
+.rule{height:4px;background:linear-gradient(90deg,var(--blue) 35%,var(--bar) 35%);margin:0 0 18px}
+p{margin:0 0 20px;font-weight:400}
+.btn{display:block;width:100%;padding:18px;border:0;background:var(--blue);color:#fff;font:600 1.05rem Montserrat,Arial,sans-serif;cursor:pointer}
+.btn:hover{background:var(--navy)}
+.btn:focus-visible{outline:3px solid var(--navy);outline-offset:3px}
+.btn[disabled]{background:var(--lgray);cursor:default}
+.btn.alt{background:var(--navy);margin-top:12px}
+input[type=file]{display:none}
+#grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:20px 0 0}
+.t{position:relative;aspect-ratio:1;background:#eee;overflow:hidden}
+.t img{width:100%;height:100%;object-fit:cover}
+.t span{position:absolute;inset:auto 0 0 0;padding:2px 4px;font-size:.7rem;font-weight:600;color:#fff;background:var(--gray)}
+.t.ok span{background:var(--blue)}.t.err span{background:#b3261e}
+#msg{margin:16px 0 0;font-weight:600}
+#msg.ok{color:var(--navy)}#msg.err{color:#b3261e}
+progress{width:100%;height:8px;margin-top:16px;accent-color:var(--blue)}
+footer{max-width:560px;margin:0 auto;padding:0 20px 24px;font-size:.78rem;color:var(--gray);font-weight:300}
+footer div{height:5px;background:var(--bar);margin-bottom:10px}
+footer a{color:var(--blue)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="bar"><i></i><b></b></div>
+<main>
+  <img class="logo" src="logo.png" alt="JEENISo" onerror="this.outerHTML='<strong class=logo style=font-size:2rem;color:#3594d6>JEENISo</strong>'">
+  <h1>Séminaire d'intégration</h1>
+  <div class="rule"></div>
+  <p>Vous avez pris des photos pendant l'événement ? Ajoutez-les ici, elles seront envoyées directement à l'équipe JEENISo.</p>
+
+  <input id="file" type="file" accept="image/*" multiple>
+  <button class="btn" id="pick">Choisir mes photos</button>
+  <button class="btn alt" id="send" hidden>Envoyer</button>
+  <progress id="bar" value="0" max="1" hidden></progress>
+  <div id="msg" role="status"></div>
+  <div id="grid"></div>
+</main>
+<footer>
+  <div></div>
+  E-mail <a href="mailto:contact@jeeniso.com">contact@jeeniso.com</a> · Junior Enterprise JEENISo
+</footer>
+
+<script>
+// ✅ CORRECT (Clean public URL)
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwxOqLHfhJjH5Za-FvSadDIQCDuX15oEU-KKWFS3Vb-NZ04ikyCXMz8-NLg-ENbZ4G_LQ/exec";
+const MAX_SIDE = 2400, QUALITY = 0.88;
+
+const $ = id => document.getElementById(id);
+let files = [];
+
+$('pick').onclick = () => $('file').click();
+$('file').onchange = e => {
+  files = [...e.target.files];
+  $('grid').innerHTML = '';
+  files.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 't'; d.id = 't' + i;
+    d.innerHTML = '<img alt=""><span>En attente</span>';
+    d.querySelector('img').src = URL.createObjectURL(f);
+    $('grid').appendChild(d);
+  });
+  $('send').hidden = !files.length;
+  $('send').textContent = files.length > 1 ? `Envoyer ${files.length} photos` : 'Envoyer la photo';
+  setMsg('');
+};
+
+function setMsg(t, c) { $('msg').textContent = t; $('msg').className = c || ''; }
+
+function shrink(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      
+      c.width = Math.round(img.width * s);
+      c.height = Math.round(img.height * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      res(c.toDataURL('image/jpeg', QUALITY).split(',')[1]);
+    };
+    img.onerror = () => rej(new Error('Image illisible'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+$('send').onclick = async () => {
+  if (SCRIPT_URL.startsWith('COLLE')) { setMsg("Le site n'est pas encore relié à Google Drive.", 'err'); return; }
+  $('send').disabled = $('pick').disabled = true;
+  $('bar').hidden = false; $('bar').max = files.length; $('bar').value = 0;
+  let done = 0, failed = 0, lastErr = '';
+  for (let i = 0; i < files.length; i++) {
+    const tile = $('t' + i);
+    if (tile.classList.contains('ok')) { done++; $('bar').value = i + 1; continue; }
+    tile.classList.remove('err');
+    tile.querySelector('span').textContent = 'Envoi…';
+    try {
+      const data = await shrink(files[i]);
+      const name = files[i].name.replace(/\.[^.]+$/, '') + '.jpg';
+      const r = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify({ name, data }) });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error);
+      tile.classList.add('ok'); tile.querySelector('span').textContent = 'Envoyée';
+      done++;
+    } catch (e) {
+      lastErr = e && e.message ? e.message : String(e);
+      tile.classList.add('err'); tile.querySelector('span').textContent = 'Échec';
+      failed++;
+    }
+    $('bar').value = i + 1;
+  }
+  $('bar').hidden = true;
+  $('pick').disabled = false;
+  if (failed) {
+    setMsg(`${done} envoyée(s), ${failed} en échec. Détail : ${lastErr}`, 'err');
+    $('send').disabled = false; $('send').textContent = 'Réessayer';
+  } else {
+    setMsg('Merci ! Vos photos ont bien été envoyées.', 'ok');
+    $('send').hidden = true; $('send').disabled = false; files = [];
+  }
+};
+</script>
+</body>
+</html>
